@@ -1,0 +1,20 @@
+[Bb]uild/
+[Bb]in/
+
+*.class
+*.log
+
+# sbt stuff
+.cache/
+.history/
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# scala ide
+.scala_dependencies
+.worksheet
