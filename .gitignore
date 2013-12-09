@@ -18,3 +18,8 @@ project/plugins/project/
 # scala ide
 .scala_dependencies
 .worksheet
+
+# eclipse
+.classpath
+.project
+.cache
