@@ -20,7 +20,8 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
   def idle: Receive = {
 
     // if work is available request it
-    case WorkIsReady => master ! WorkerRequestsWork(self)
+    case WorkIsReady =>
+      master ! WorkerRequestsWork(self)
 
     // master replied: do stuff!
     case WorkToBeDone(owner, work) => {
@@ -59,6 +60,12 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
 
   // start with being idle
   def receive = idle
+
+  // we need to inform the master that we're up and running
+  override def preStart = {
+    super.preStart
+    master ! WorkerCreated(self)
+  }
 
 }
 
