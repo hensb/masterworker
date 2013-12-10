@@ -1,13 +1,16 @@
 package de.uniwue.info2.masterworker.messagebounce
 
+import scala.concurrent.duration.DurationInt
+import akka.actor.ActorLogging
+import akka.actor.ActorPath
+import akka.actor.ActorRef
 import akka.actor.ActorSystem
+import akka.actor.Props
+import akka.actor.actorRef2Scala
 import de.uniwue.info2.masterworker.Master
 import de.uniwue.info2.masterworker.Worker
-import akka.actor.ActorPath
-import akka.actor.ActorLogging
-import akka.actor.ActorRef
-import de.uniwue.info2.masterworker.Worker._
-import akka.actor.Props
+import de.uniwue.info2.masterworker.Worker.Done
+import scala.util.Random
 
 object BounceMessages extends App {
 
@@ -29,7 +32,9 @@ class MyWorker(path: ActorPath) extends Worker(path: ActorPath) with ActorLoggin
 
   def doWork(owner: ActorRef, work: Any) = {
     log.info("lol - doing work!")
-    owner ! "herpa"
+
+    Thread.sleep(Random.nextInt(2000))
+
     self ! Done
   }
 }

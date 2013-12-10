@@ -5,6 +5,7 @@ import akka.actor.ActorLogging
 import akka.actor.ActorRef
 import akka.actor.Props
 import akka.actor.Terminated
+import akka.actor.actorRef2Scala
 import de.uniwue.info2.masterworker.Master._
 
 class Master extends Actor with ActorLogging {
@@ -77,6 +78,8 @@ class Master extends Actor with ActorLogging {
     // requesting worker should be known to the master
     if (workers.contains(worker)) {
       pendingWork match {
+
+        // there is work to do
         case (owner, workload) :: xs => {
           // send workload to worker
           worker ! WorkToBeDone(owner, workload)
@@ -84,6 +87,8 @@ class Master extends Actor with ActorLogging {
           pendingWork = pendingWork.tail
           workers += (worker -> Some(owner, workload))
         }
+
+        // no work available
         case Nil => worker ! NoWorkToBeDone
       }
     }

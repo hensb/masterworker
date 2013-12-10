@@ -7,6 +7,8 @@ import akka.actor.ActorRef
 import akka.actor.ActorSelection.toScala
 import de.uniwue.info2.masterworker.Master._
 import de.uniwue.info2.masterworker.Worker._
+import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
   val master = context.actorSelection(path)
@@ -34,7 +36,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     case NoWorkToBeDone => ()
 
     // any other message
-    case m: Any => log.warning("I received a message I don't understand: {}", m); unhandled(m)
+    case m: Any => log.warning("While idle I received a message I don't understand: {}", m); unhandled(m)
   }
 
   // worker's busy routine
@@ -55,7 +57,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     }
 
     // any other message
-    case m: Any => log.warning("I received a message I don't understand: {}", m); unhandled(m)
+    case m: Any => log.warning("While busy I received a message I don't understand: {}", m); unhandled(m)
   }
 
   // start with being idle
@@ -70,7 +72,6 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
 }
 
 object Worker {
-
   // send this object to self to become idle again
   case class Done
 }
