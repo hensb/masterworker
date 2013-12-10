@@ -3,9 +3,9 @@ package de.uniwue.info2.masterworker
 import akka.actor.Actor
 import akka.actor.ActorLogging
 import akka.actor.ActorRef
-import de.uniwue.info2.masterworker.Master._
-import akka.actor.Terminated
 import akka.actor.Props
+import akka.actor.Terminated
+import de.uniwue.info2.masterworker.Master._
 
 class Master extends Actor with ActorLogging {
   import context._
@@ -13,74 +13,76 @@ class Master extends Actor with ActorLogging {
   // an abstract work item and its owner
   type Workload = (ActorRef, Any)
 
+  // -- actor state:
+  // workers and their workloads
+  var workers = Map.empty[ActorRef, Option[Workload]]
+
+  // queue of pending work items
+  var pendingWork = List.empty[Workload]
+
   override def preStart() = {
     log.debug("Master is starting.")
   }
 
   /** processes incoming messages and keeps track of pending work */
-  private def workWith(pendingWork: List[(ActorRef, Any)], workers: Map[ActorRef, Option[Workload]]): Receive = {
+  def receive = {
     // an actor was created
-    case WorkerCreated(worker) =>
-      become(workWith(pendingWork, workerCreated(worker, pendingWork, workers)))
+    case WorkerCreated(worker) => workerCreated(worker)
     // an actor requests work
-    case WorkerRequestsWork(worker) => workRequest(worker, pendingWork, workers)
+    case WorkerRequestsWork(worker) => workRequest(worker)
     // a worker is done working
-    case WorkIsDone(worker) => workDone(worker, workers)
+    case WorkIsDone(worker) => workDone(worker)
     // a worker terminated
-    case Terminated(worker) => become(workWith(pendingWork, workerTerminated(worker, workers)))
+    case Terminated(worker) => workerTerminated(worker)
     // on any other message create work item
-    case m: Any => become(workWith(enqueueWork(sender, m, pendingWork, workers), workers))
+    case m: Any => enqueueWork(sender, m)
   }
 
-  // start with empty work queue
-  def receive = workWith(List(), Map())
-
   /** enqueue a new work item and notify idling workers*/
-  private def enqueueWork(owner: ActorRef, work: Any, pendingWork: List[Workload],
-    workers: Map[ActorRef, Option[Workload]]) = {
+  private def enqueueWork(owner: ActorRef, work: Any) = {
     log.info("Enqueueing new workitem {}", work)
 
-    notifyWorkers(pendingWork, workers)
-    (sender, work) :: pendingWork
+    pendingWork = (sender, work) :: pendingWork
+    notifyWorkers()
   }
 
   /** after a worker died, its work re-dispatched */
-  private def workerTerminated(worker: ActorRef, workers: Map[ActorRef, Option[Workload]]) = {
+  private def workerTerminated(worker: ActorRef) = {
 
     workers.get(worker) map {
       case Some((owner, workload)) => {
-        log.error("A worker died: {}.", worker)
+        log.error("A busy worker died: {}.", worker)
         // reschedule work
         self ! (workload, owner)
       }
-      case None =>
+      case None => log.error("An idling worker died: {}.", worker)
     }
 
-    workers - worker
+    workers -= worker
   }
 
   /** will be called whenever a worker finished its task */
-  private def workDone(worker: ActorRef, workers: Map[ActorRef, Option[Workload]]) = {
+  private def workDone(worker: ActorRef) = {
     if (!workers.contains(worker))
       log.error("I don't know this guy: {}", worker)
 
     // set worker to idle
-    else workers + (worker -> None)
+    else workers += (worker -> None)
   }
 
   /** a worker requested work */
-  private def workRequest(worker: ActorRef, work: List[Workload], workers: Map[ActorRef, Option[Workload]]) = {
+  private def workRequest(worker: ActorRef) = {
     log.debug("Worker {} requests work.", worker)
 
     // requesting worker should be known to the master
     if (workers.contains(worker)) {
-      work match {
+      pendingWork match {
         case (owner, workload) :: xs => {
-          System.err.println("sending " + worker)
           // send workload to worker
           worker ! WorkToBeDone(owner, workload)
-          // continue with reduced workload and save worker state as busy 
-          become(workWith(xs, workers + (worker -> Some(owner, workload))))
+          // continue with reduced workload and save worker state as busy
+          pendingWork = pendingWork.tail
+          workers += (worker -> Some(owner, workload))
         }
         case Nil => worker ! NoWorkToBeDone
       }
@@ -88,25 +90,23 @@ class Master extends Actor with ActorLogging {
   }
 
   /** all idling workers will be informed that there is work to be done   */
-  private def notifyWorkers(work: List[Workload], workers: Map[ActorRef, Option[Workload]]) = {
+  private def notifyWorkers() = {
     // list of workers currently idling
     def idleWorkers = workers filter { case (worker, load) => load == None } keys
 
-    if (!work.isEmpty)
+    if (!pendingWork.isEmpty)
       idleWorkers foreach (_ ! WorkIsReady)
   }
 
   /** will be called upon worker creation */
-  private def workerCreated(worker: ActorRef, work: List[Workload], workers: Map[ActorRef, Option[Workload]]) = {
+  private def workerCreated(worker: ActorRef) = {
     log.debug("A worker has been created: {}.", worker)
     // monitor worker
     context watch worker
     // ... and add to map of workers
-    val newWorkers = workers + (worker -> None)
+    workers += (worker -> None)
     // broadcast work, if any
-    notifyWorkers(work, newWorkers)
-    // return new workers
-    newWorkers
+    notifyWorkers()
   }
 }
 
