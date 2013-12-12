@@ -75,29 +75,38 @@ class Master extends Actor with ActorLogging {
   private def workRequest(worker: ActorRef) = {
     log.debug("Worker {} requests work.", worker)
 
-    // requesting worker should be known to the master
-    if (workers.contains(worker)) {
+    // tell him to do stuff
+    def dispatchWork(a: ActorRef) = {
       pendingWork match {
 
         // there is work to do
         case (owner, workload) :: xs => {
           // send workload to worker
-          worker ! WorkToBeDone(owner, workload)
+          log.debug(s"Sending work to worker ${a.path}.")
+          a ! WorkToBeDone(owner, workload)
           // continue with reduced workload and save worker state as busy
           pendingWork = pendingWork.tail
-          workers += (worker -> Some(owner, workload))
+          workers += (a -> Some(owner, workload))
         }
 
         // no work available
-        case Nil => worker ! NoWorkToBeDone
+        case Nil => a ! NoWorkToBeDone
       }
+    }
+
+    // requesting worker should be known to the master and not be busy
+    workers.get(worker) map {
+      case None => dispatchWork(worker)
+      case Some(t) => log.debug("Already busy. Drop request.")
     }
   }
 
   /** all idling workers will be informed that there is work to be done   */
   private def notifyWorkers() = {
     // list of workers currently idling
-    def idleWorkers = workers filter { case (worker, load) => load == None } keys
+    def idleWorkers = for {
+      (k, None) <- workers
+    } yield k
 
     if (!pendingWork.isEmpty)
       idleWorkers foreach (_ ! WorkIsReady)
@@ -105,7 +114,7 @@ class Master extends Actor with ActorLogging {
 
   /** will be called upon worker creation */
   private def workerCreated(worker: ActorRef) = {
-    log.debug("A worker has been created: {}.", worker)
+    log.info("A worker has been created: {}.", worker)
     // monitor worker
     context watch worker
     // ... and add to map of workers

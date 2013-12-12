@@ -1,21 +1,31 @@
 package de.uniwue.info2.masterworker
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Promise
 import akka.actor.Actor
 import akka.actor.ActorLogging
 import akka.actor.ActorPath
 import akka.actor.ActorRef
 import akka.actor.ActorSelection.toScala
-import de.uniwue.info2.masterworker.Master._
-import de.uniwue.info2.masterworker.Worker._
+import akka.actor.actorRef2Scala
+import de.uniwue.info2.masterworker.Master.NoWorkToBeDone
+import de.uniwue.info2.masterworker.Master.WorkIsDone
+import de.uniwue.info2.masterworker.Master.WorkIsReady
+import de.uniwue.info2.masterworker.Master.WorkToBeDone
+import de.uniwue.info2.masterworker.Master.WorkerCreated
+import de.uniwue.info2.masterworker.Master.WorkerRequestsWork
+import de.uniwue.info2.masterworker.Worker.DoneWorking
+import scala.concurrent.ExecutionContext
 
 abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
   val master = context.actorSelection(path)
 
   /** will be implemented by concrete worker */
   @throws(classOf[Exception])
-  def doWork(owner: ActorRef, work: Any)
+  def doWork(owner: ActorRef, work: Any, p: Promise[Unit])
 
   import context._
+  import ExecutionContext.Implicits.global
 
   // worker's idle routine
   def idle: Receive = {
@@ -27,7 +37,16 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     // master replied: do stuff!
     case WorkToBeDone(owner, work) => {
       log.info("Received work-item: {}", work)
-      doWork(owner, work)
+
+      // if work is done at some point in the future, become 'idle' again
+      val p = Promise[Unit]()
+      val me = self // capture reference to self!
+      p.future.onComplete { _ => me ! DoneWorking }
+
+      // perform work
+      doWork(owner, work, p)
+
+      // change state to 'busy'
       become(busy)
     }
 
@@ -45,14 +64,14 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     case WorkToBeDone(owner, work) => log.error("I am already working. I should not get any more items! {}", work)
 
     // i'm done with my work ...
-    case Done => {
+    case DoneWorking => {
       log.info("Work complete!")
+      // become idle
+      become(idle)
       // ... notify master 
       master ! WorkIsDone(self)
       // ... request more work
       master ! WorkerRequestsWork(self)
-      // become idle
-      become(idle)
     }
 
     // any other message
@@ -72,5 +91,5 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
 
 object Worker {
   // send this object to self to become idle again
-  case class Done
+  case class DoneWorking
 }

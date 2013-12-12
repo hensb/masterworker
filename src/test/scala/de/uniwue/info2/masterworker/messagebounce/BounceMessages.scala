@@ -1,6 +1,8 @@
 package de.uniwue.info2.masterworker.messagebounce
 
+import scala.concurrent.Promise
 import scala.concurrent.duration.DurationInt
+import scala.util.Random
 import akka.actor.ActorLogging
 import akka.actor.ActorPath
 import akka.actor.ActorRef
@@ -9,8 +11,8 @@ import akka.actor.Props
 import akka.actor.actorRef2Scala
 import de.uniwue.info2.masterworker.Master
 import de.uniwue.info2.masterworker.Worker
-import de.uniwue.info2.masterworker.Worker.Done
-import scala.util.Random
+import akka.actor.PoisonPill
+import akka.routing.RoundRobinRouter
 
 object BounceMessages extends App {
 
@@ -18,10 +20,13 @@ object BounceMessages extends App {
 
     val system = ActorSystem("system")
     val master = system.actorOf(Master.mkProps(), "master")
-    val worker = system.actorOf(MyWorker.mkProps(master.path), "worker")
+    val worker = system.actorOf(MyWorker.mkProps(master.path).
+      withRouter(RoundRobinRouter(5)), "workerRouter")
 
     master ! "peng"
-    master ! "zack"
+    master ! "zack1"
+    master ! "zack2"
+    master ! "zack3"
     master ! "bumm"
     master ! "derp"
   }
@@ -29,12 +34,10 @@ object BounceMessages extends App {
 
 class MyWorker(path: ActorPath) extends Worker(path: ActorPath) with ActorLogging {
 
-  def doWork(owner: ActorRef, work: Any) = {
-    log.info("lol - doing work!")
+  def doWork(owner: ActorRef, work: Any, p: Promise[Unit]) = {
 
     Thread.sleep(Random.nextInt(2000))
-
-    self ! Done
+    p.success()
   }
 }
 object MyWorker {
