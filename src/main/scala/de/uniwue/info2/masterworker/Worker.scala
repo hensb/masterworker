@@ -7,13 +7,12 @@ import akka.actor.ActorRef
 import akka.actor.ActorSelection.toScala
 import de.uniwue.info2.masterworker.Master._
 import de.uniwue.info2.masterworker.Worker._
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
 
 abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
   val master = context.actorSelection(path)
 
   /** will be implemented by concrete worker */
+  @throws(classOf[Exception])
   def doWork(owner: ActorRef, work: Any)
 
   import context._

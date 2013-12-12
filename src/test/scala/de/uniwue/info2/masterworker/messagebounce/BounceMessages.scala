@@ -17,7 +17,6 @@ object BounceMessages extends App {
   override def main(args: Array[String]) {
 
     val system = ActorSystem("system")
-
     val master = system.actorOf(Master.mkProps(), "master")
     val worker = system.actorOf(MyWorker.mkProps(master.path), "worker")
 
