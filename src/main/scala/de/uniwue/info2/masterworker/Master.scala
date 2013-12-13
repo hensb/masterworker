@@ -39,6 +39,23 @@ class Master extends Actor with ActorLogging {
     case m: Any => enqueueWork(sender, m)
   }
 
+  private def checkTimeout(worker: ActorRef, owner: ActorRef, work: Any) = {
+    log.info(s"Checking timeout for ${worker.path}")
+
+    workers.get(worker) map {
+      case Some((curOwn, curWork)) => {
+        // if worker is still working on the same task for the same owner, 
+        // remove the worker and re-schedule the work
+        log.info(s"$curWork $work $curOwn $owner")
+        if (curWork == work && owner == curOwn) {
+          workers -= worker
+          self.tell(work, owner)
+        }
+      }
+      case None =>
+    }
+  }
+
   /** enqueue a new work item and notify idling workers*/
   private def enqueueWork(owner: ActorRef, work: Any) = {
     log.info(s"Enqueueing new workitem $work from ${owner.path}")
@@ -49,12 +66,11 @@ class Master extends Actor with ActorLogging {
 
   /** after a worker died, its work re-dispatched */
   private def workerTerminated(worker: ActorRef) = {
-
     workers.get(worker) map {
       case Some((owner, workload)) => {
         log.error("A busy worker died: {}.", worker)
         // reschedule work
-        self ! (workload, owner)
+        self tell (workload, owner)
       }
       case None => log.error("An idling worker died: {}.", worker)
     }
@@ -62,10 +78,21 @@ class Master extends Actor with ActorLogging {
     workers -= worker
   }
 
+  private def workerRestarted(worker: ActorRef) = {
+    workers.get(worker) map {
+      case Some((owner, workload)) => {
+        log.error(s"A busy worker restarted: ${worker.path}. His work: $workload.")
+        // reschedule work
+        self tell (workload, owner)
+      }
+      case None => log.error(s"An idling worker restarted: ${worker.path}.")
+    }
+  }
+
   /** will be called whenever a worker finished its task */
   private def workDone(worker: ActorRef) = {
     if (!workers.contains(worker))
-      log.error("I don't know this guy: {}", worker)
+      log.debug(s"I don't know this guy: ${worker.path}, requesting handshake.")
 
     // set worker to idle
     else workers += (worker -> None)

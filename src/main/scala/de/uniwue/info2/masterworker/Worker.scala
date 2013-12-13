@@ -16,6 +16,7 @@ import de.uniwue.info2.masterworker.Master.WorkerCreated
 import de.uniwue.info2.masterworker.Master.WorkerRequestsWork
 import de.uniwue.info2.masterworker.Worker.DoneWorking
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 
 abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
   val master = context.actorSelection(path)
@@ -36,7 +37,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
 
     // master replied: do stuff!
     case WorkToBeDone(owner, work) => {
-      log.info("Received work-item: {}", work)
+      log.info(s"Received work-item $work by ${owner.path}.")
 
       // if work is done at some point in the future, become 'idle' again
       val p = Promise[Unit]()
@@ -87,6 +88,11 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     master ! WorkerCreated(self)
   }
 
+  // in case of a restart while working, re-issue work-request
+  override def preRestart(t: Throwable, msg: Option[Any]) {
+    msg map { case WorkToBeDone(owner, work) => master.tell(work, owner) }
+    super.preRestart(t, msg)
+  }
 }
 
 object Worker {
