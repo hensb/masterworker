@@ -41,9 +41,9 @@ class Master extends Actor with ActorLogging {
 
   /** enqueue a new work item and notify idling workers*/
   private def enqueueWork(owner: ActorRef, work: Any) = {
-    log.info("Enqueueing new workitem {}", work)
+    log.info(s"Enqueueing new workitem $work from ${owner.path}")
 
-    pendingWork = (sender, work) :: pendingWork
+    pendingWork = (owner, work) :: pendingWork
     notifyWorkers()
   }
 
@@ -82,7 +82,7 @@ class Master extends Actor with ActorLogging {
         // there is work to do
         case (owner, workload) :: xs => {
           // send workload to worker
-          log.debug(s"Sending work to worker ${a.path}.")
+          log.debug(s"Sending work (${owner.path}, $workload) to worker ${a.path}.")
           a ! WorkToBeDone(owner, workload)
           // continue with reduced workload and save worker state as busy
           pendingWork = pendingWork.tail
