@@ -101,10 +101,10 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     case m: Any => log.warning("While busy I received a message I don't understand: {}", m); unhandled(m)
   }
 
-  // start with being idle
+  // start by booting up
   def receive = booting
 
-  // we need to inform the master that we're up and running
+  // first task: look up (remote) master
   override def preStart = {
     super.preStart
 
