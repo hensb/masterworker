@@ -47,7 +47,7 @@ class Master extends Actor with ActorLogging {
     // an actor requests work
     case WorkerRequestsWork(worker, timeout) => workRequest(worker, timeout)
     // a worker is done working
-    case WorkIsDone(worker, result) => workDone(worker, result)
+    case WorkIsDone(worker) => workDone(worker)
     // a worker terminated
     case Terminated(worker) => workerTerminated(worker)
     // a timeout needs to be checked
@@ -101,19 +101,11 @@ class Master extends Actor with ActorLogging {
   }
 
   /** will be called whenever a worker finished its task */
-  private def workDone(worker: ActorRef, result: Any) = {
+  private def workDone(worker: ActorRef) = {
     if (!workers.contains(worker))
       log.debug(s"I don't know this guy: ${worker.path}, requesting handshake.")
 
-    else {
-
-      // notify owner, if we actually excepted something from this worker
-      workers.get(worker) map {
-        case Some((owner, work)) => owner ! Result(result)
-        case None =>
-      }
-      setIdling(worker)
-    }
+    else setIdling(worker)
   }
 
   private def setIdling(worker: ActorRef) {
@@ -218,7 +210,7 @@ object Master {
 
   case class WorkToBeDone(owner: ActorRef, work: Any)
 
-  case class WorkIsDone(w: ActorRef, result: Any)
+  case class WorkIsDone(w: ActorRef)
 
   case class Result(result: Any)
 

@@ -93,7 +93,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
     case WorkToBeDone(owner, work) => log.error("I am already working. I should not get any more items! {}", work)
 
     // i'm done with my work ...
-    case DoneWorking => {
+    case DoneWorking() => {
       log.info("Work complete!")
       // become idle
       become(idle(master))
