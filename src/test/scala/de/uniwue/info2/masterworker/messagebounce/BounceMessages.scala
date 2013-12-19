@@ -39,13 +39,17 @@ class MyWorker(path: ActorPath) extends Worker(path: ActorPath) with ActorLoggin
 
   override def timeout = 500 milliseconds
 
-  override def doWork(owner: ActorRef, work: Any, p: Promise[Unit]) = {
+  override def doWork(owner: ActorRef, work: Any, p: Promise[Unit]) = work match {
 
-    if (0.5 >= Random.nextDouble)
-      throw new IllegalStateException("Trollololol. U MAD, BRO?")
+    case x: String => {
+      if (0.5 >= Random.nextDouble)
+        throw new IllegalStateException("Trollololol. U MAD, BRO?")
 
-    Thread.sleep(Random.nextInt(2000))
-    p.success()
+      Thread.sleep(Random.nextInt(2000))
+      p.success()
+    }
+
+    case _ => System.err.println(s"WTF? $work");
   }
 }
 object MyWorker {

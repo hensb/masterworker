@@ -66,7 +66,7 @@ class Master extends Actor with ActorLogging {
         log.info(s"worker took too long. rescheduling his work.")
         if (curWork == work && owner == curOwn) {
           setIdling(worker)
-          self tell (work, owner)
+          self.tell(work, owner)
         }
       }
       case None =>
@@ -87,7 +87,7 @@ class Master extends Actor with ActorLogging {
       case Some((owner, workload)) => {
         log.error("A busy worker died: {}. Rescheduling his work.", worker)
         // reschedule work
-        self tell (workload, owner)
+        self.tell(workload, owner)
         // remove worker
         workers -= worker
         // cancel timeout checks
@@ -100,12 +100,22 @@ class Master extends Actor with ActorLogging {
     workers -= worker
   }
 
+  var counter = 0
+
   /** will be called whenever a worker finished its task */
   private def workDone(worker: ActorRef) = {
     if (!workers.contains(worker))
       log.debug(s"I don't know this guy: ${worker.path}, requesting handshake.")
 
-    else setIdling(worker)
+    else {
+      //      workers.get(worker) map {
+      //        case Some((actor, work)) =>
+      //          count += 1;
+      //          System.err.println(s"$count tasks complete.")
+      //        case None =>
+      //      }
+      setIdling(worker)
+    }
   }
 
   private def setIdling(worker: ActorRef) {
@@ -173,7 +183,7 @@ class Master extends Actor with ActorLogging {
 
       // reschedule the work
       case Some((owner, workload)) => {
-        self ! (workload, owner)
+        self.tell(workload, owner)
         pending.get(worker) map (_.cancel)
         pending -= worker
       }
