@@ -23,17 +23,25 @@ object BounceMessages extends App {
     val system = ActorSystem("system")
     val master = system.actorOf(Master.mkProps(), "master")
     val worker = system.actorOf(MyWorker.mkProps(master.path).
-      withRouter(RoundRobinRouter(1)), "workerRouter")
+      withRouter(RoundRobinRouter(5)), "workerRouter")
 
-    master ! "peng"
+    master ! "peng1"
+    master ! "peng2"
+    master ! "peng3"
+    master ! "peng4"
+    master ! "peng5"
+    master ! "peng6"
+    master ! "peng7"
   }
 }
 
 class MyWorker(path: ActorPath) extends Worker(path: ActorPath) with ActorLogging {
 
+  override def timeout = 500 milliseconds
+
   override def doWork(owner: ActorRef, work: Any, p: Promise[Unit]) = {
 
-    if (0.2 >= Random.nextDouble)
+    if (0.5 >= Random.nextDouble)
       throw new IllegalStateException("Trollololol. U MAD, BRO?")
 
     Thread.sleep(Random.nextInt(2000))

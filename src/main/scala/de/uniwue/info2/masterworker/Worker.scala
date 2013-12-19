@@ -37,6 +37,12 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
   @throws(classOf[Exception])
   def doWork(owner: ActorRef, work: Any, p: Promise[Unit])
 
+  /**
+   * after timeout has passed, the
+   *  operation done in doneWork is considered as failed
+   */
+  def timeout: FiniteDuration
+
   def booting: Receive = {
     case ActorIdentity(path, Some(master)) => {
       setReceiveTimeout(Duration.Undefined)
@@ -55,7 +61,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
 
     // if work is available request it
     case WorkIsReady =>
-      master ! WorkerRequestsWork(self)
+      master ! WorkerRequestsWork(self, timeout)
 
     // master replied: do stuff!
     case WorkToBeDone(owner, work) => {
@@ -94,7 +100,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
       // ... notify master 
       master ! WorkIsDone(self)
       // ... request more work
-      master ! WorkerRequestsWork(self)
+      master ! WorkerRequestsWork(self, timeout)
     }
 
     // any other message
