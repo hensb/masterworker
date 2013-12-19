@@ -41,7 +41,7 @@ abstract class Worker(path: ActorPath) extends Actor with ActorLogging {
    * after timeout has passed, the
    *  operation done in doneWork is considered as failed
    */
-  def timeout: FiniteDuration
+  def timeout = 30 seconds
 
   def booting: Receive = {
     case ActorIdentity(path, Some(master)) => {
