@@ -29,8 +29,6 @@ class Master extends Actor with ActorLogging {
   // queue of pending work items
   var pendingWork = List.empty[Workload]
 
-  var count = 0
-
   override def preStart() = {
     log.debug("Master is starting.")
   }
@@ -100,22 +98,12 @@ class Master extends Actor with ActorLogging {
     workers -= worker
   }
 
-  var counter = 0
-
   /** will be called whenever a worker finished its task */
   private def workDone(worker: ActorRef) = {
     if (!workers.contains(worker))
       log.debug(s"I don't know this guy: ${worker.path}, requesting handshake.")
 
-    else {
-      //      workers.get(worker) map {
-      //        case Some((actor, work)) =>
-      //          count += 1;
-      //          System.err.println(s"$count tasks complete.")
-      //        case None =>
-      //      }
-      setIdling(worker)
-    }
+    else setIdling(worker)
   }
 
   private def setIdling(worker: ActorRef) {
