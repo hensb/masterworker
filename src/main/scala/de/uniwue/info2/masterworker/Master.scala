@@ -19,9 +19,14 @@ class Master extends Actor with ActorLogging {
   // an abstract work item and its owner
   type Workload = (ActorRef, Any)
 
+  val maxRetries = 5
+
   // -- actor state:
   // workers and their workloads
   var workers = Map.empty[ActorRef, Option[Workload]]
+
+  // counts nr of attempts to work on a certain item
+  var attempts = Map.empty[Workload, Int].withDefault(_ => 0)
 
   // workers and their scheduled timeouts
   var pending = Map.empty[ActorRef, Cancellable]
@@ -61,6 +66,8 @@ class Master extends Actor with ActorLogging {
       case Some((curOwn, curWork)) => {
         // if worker is still working on the same task for the same owner, 
         // set worker to idle and re-schedule the work
+        // 
+        // we attempt to do so not more than MAX_RETRIES times before notifying the owner
         log.info(s"worker took too long. rescheduling his work.")
         if (curWork == work && owner == curOwn) {
           setIdling(worker)
@@ -75,8 +82,18 @@ class Master extends Actor with ActorLogging {
   private def enqueueWork(owner: ActorRef, work: Any) = {
     log.info(s"Enqueueing new workitem $work from ${owner.path}")
 
-    pendingWork = (owner, work) :: pendingWork
-    notifyWorkers()
+    val w: Workload = (owner, work)
+    attempts += (w -> (attempts(w) + 1))
+
+    // if this particular item has already been tried too many times, discard it
+    if (attempts(w) > maxRetries) {
+      attempts -= w
+      owner ! FailedAfter(work, maxRetries)
+    } // otherwise enqueue it for processing
+    else {
+      pendingWork = w :: pendingWork
+      notifyWorkers()
+    }
   }
 
   /** after a worker died, its work re-dispatched */
@@ -211,6 +228,8 @@ object Master {
   case class WorkIsDone(w: ActorRef)
 
   case class Result(result: Any)
+
+  case class FailedAfter(m: Any, n: Int)
 
   case class CheckTimeout(w: ActorRef, o: ActorRef, work: Any)
 }

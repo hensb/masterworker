@@ -2,7 +2,7 @@ name := "masterworker"
 
 organization := "de.uniwue.info2"
 
-version := "1.3-RELEASE"
+version := "1.3.1-RELEASE"
 
 scalaVersion := "2.10.2"
 
